@@ -33,6 +33,10 @@ postgres:
   service:
     port: 15432
 
+  storage:
+    size: 2Gi
+    class: ""
+
 haproxy:
   image:
     repository: haproxy

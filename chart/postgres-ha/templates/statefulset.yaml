@@ -119,7 +119,11 @@ spec:
     - metadata:
         name: data
       spec:
-        accessModes: [ "ReadWriteOnce" ]
+        accessModes:
+          - ReadWriteOnce
+        {{- with .Values.postgres.storage.class }}
+        storageClassName: {{ . }}
+        {{- end }}
         resources:
           requests:
-            storage: 2Gi
+            storage: {{ .Values.postgres.storage.size }}
