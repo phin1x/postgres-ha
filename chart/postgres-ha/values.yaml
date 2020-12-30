@@ -4,11 +4,64 @@
 
 replicaCount: 2
 
-image:
-  repository: postgres
-  pullPolicy: Never
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "v13-repmgr"
+postgres:
+  image:
+    repository: postgres
+    tag: "v13-repmgr"
+    pullPolicy: Never
+
+  securityContext: {}
+    # capabilities:
+    #   add:
+    #     - CHOWN
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  service:
+    port: 15432
+
+haproxy:
+  image:
+    repository: haproxy
+    tag: "2.2"
+    pullPolicy: IfNotPresent
+
+  securityContext: {}
+    # capabilities:
+    #   add:
+    #     - CHOWN
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  service:
+    type: ClusterIP
+    port: 5432
 
 imagePullSecrets: []
 nameOverride: ""
@@ -28,21 +81,6 @@ podAnnotations: {}
 podSecurityContext: {}
   #fsGroup: 70
 
-securityContext: {}
-  # capabilities:
-  #   add:
-  #     - CHOWN
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
-service:
-  pgpool:
-    type: ClusterIP
-    port: 5432
-  postgres:
-    port: 15432
-
 ingress:
   enabled: false
   annotations: {}
@@ -55,18 +93,6 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
 
 autoscaling:
   enabled: false

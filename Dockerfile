@@ -61,6 +61,7 @@ RUN set -ex \
                gosu \
                locales \
 		dnsutils  \
+		xinetd \
 #              krb5-dev \
 #              tcl-dev \
 #              openldap-dev \
@@ -118,23 +119,6 @@ RUN set -ex \
         && make -j8 install-world \
         && make -j8 -C contrib install \
         \
-        # install pg-pool 2
-        && wget -O /tmp/pgpool.tar.gz https://github.com/pgpool/pgpool2/archive/${PGPOOL_VERSION}.tar.gz \
-        && mkdir -p /usr/src/pgpool \
-        && tar \
-                --extract \
-                --file /tmp/pgpool.tar.gz \
-                --directory /usr/src/pgpool \
-                --strip-components 1 \
-        && rm /tmp/pgpool.tar.gz \
-        \
-        && eval "$(dpkg-buildflags --export=sh)" \
-        && export LDFLAGS="$LDFLAGS -s -w" \
-        && cd /usr/src/pgpool \
-        && ./configure \
-        && make -j8 \
-        && make -j8 install \
-        \
         # install repmgr
         && wget -O /tmp/repmgr.tar.gz https://github.com/2ndQuadrant/repmgr/archive/${REPMGR_VERSION}.tar.gz \
         && mkdir -p /usr/src/repmgr \
@@ -189,7 +173,7 @@ RUN set -ex \
                 | cut -d: -f1 \
                 | sort -u \
                 | xargs -r apt-mark manual \
-        && apt-mark manual gosu locales dnsutils \
+        && apt-mark manual gosu locales dnsutils xinetd \
         && apt-get purge -y --auto-remove \
                 wget \
                 gcc \

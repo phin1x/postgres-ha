@@ -5,7 +5,48 @@ metadata:
   labels:
     {{- include "postgres-ha.labels" . | nindent 4 }}
 data:
-  postgres-entrypoint.sh: |-
-    {{- .Files.Get "scripts/postgres-entrypoint.sh" | nindent 4 }}
-  pgpool-entrypoint.sh: |-
-    {{- .Files.Get "scripts/pgpool-entrypoint.sh" | nindent 4 }}
+  entrypoint.sh: |-
+    {{- .Files.Get "scripts/entrypoint.sh" | nindent 4 }}
+  postgresqlchk.sh: |-
+    {{- .Files.Get "scripts/postgresqlchk.sh" | nindent 4 }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgres-ha.fullname" . }}-haproxy
+  labels:
+    {{- include "postgres-ha.labels" . | nindent 4 }}
+data:
+  haproxy.cfg: |-
+    global
+        maxconn 100
+     
+    defaults
+        log global
+        mode tcp
+        retries 2
+        timeout client 30m
+        timeout connect 4s
+        timeout server 30m
+        timeout check 5s
+   
+    listen health_check_http_url
+        bind :8888
+        mode http
+        monitor-uri /healthz
+        option      dontlognull
+
+    listen postgres_master
+        bind *:5432
+        mode tcp
+        tcp-check expect string master
+        balance leastconn
+        option tcp-check
+        option allbackups
+        default-server port 9201 inter 3s downinter 5s slowstart 60s on-marked-down shutdown-sessions
+        {{- $name := include "postgres-ha.fullname" . }}
+        {{- $domain := printf "%s-headless.%s.svc.cluster.local" $name .Release.Namespace }}
+        {{- range $i, $e := until (.Values.replicaCount | int) }}
+        server {{ printf "%s-%d" $name $i }} {{ printf "%s-%d.%s" $name $i $domain }}:15432 check
+        {{- end }}

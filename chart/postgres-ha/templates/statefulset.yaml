@@ -31,11 +31,11 @@ spec:
       containers:
         - name: postgres
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+            {{- toYaml .Values.postgres.securityContext | nindent 12 }}
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
           command:
-            - /scripts/postgres-entrypoint.sh
+            - /scripts/entrypoint.sh
           ports:
             - name: postgres
               containerPort: 15432
@@ -57,7 +57,7 @@ spec:
             initialDelaySeconds: 15
             timeoutSeconds: 2
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -76,29 +76,26 @@ spec:
               mountPath: /var/lib/postgresql
             - name: scripts
               mountPath: /scripts
-        #- name: pgpool
-        #  image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-        #  imagePullPolicy: {{ .Values.image.pullPolicy }}
-        #  command:
-        #    - /scripts/pgpool-entrypoint.sh
-        #  ports:
-        #    - name: pgpool
-        #      containerPort: 5432
-        #      protocol: TCP
-        #  resources:
-        #    {{- toYaml .Values.resources | nindent 12 }}
-        #  env:
-        #    - name: POD_NAME
-        #      valueFrom:
-        #        fieldRef:
-        #          fieldPath: metadata.name
-        #    - name: POSTGRES_PASSWORD
-        #      value: asdf
-        #    - name: HEADLESS_SERVICE
-        #      value: {{ include "postgres-ha.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local
-        #  volumeMounts:
-        #    - name: scripts
-        #      mountPath: /scripts
+        - name: haproxy
+          image: "{{ .Values.haproxy.image.repository }}:{{ .Values.haproxy.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.haproxy.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.haproxy.securityContext | nindent 12 }}
+          ports:
+            - name: haproxy
+              containerPort: 5432
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8888
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          resources:
+            {{- toYaml .Values.haproxy.resources | nindent 12 }}
+          volumeMounts:
+            - name: haproxy-config
+              mountPath: /usr/local/etc/haproxy
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -116,6 +113,10 @@ spec:
           configMap:
             name: {{ include "postgres-ha.fullname" . }}-scripts
             defaultMode: 0755
+        - name: haproxy-config
+          configMap:
+            name: {{ include "postgres-ha.fullname" . }}-haproxy
+            defaultMode: 0444
   volumeClaimTemplates:
     - metadata:
         name: data

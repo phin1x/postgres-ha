@@ -172,6 +172,24 @@ init_pgpass() {
 	chmod 600 $loc
 }
 
+init_xinetd() {
+	{
+		echo "service postgresqlchk"
+		echo "{"
+		echo "flags = REUSE"
+		echo "socket_type = stream"
+		echo "wait = no"
+		echo "port = 9201"
+		echo "server = /scripts/postgresqlchk.sh"
+		echo "disable = no"
+		echo "only_from = 0.0.0.0/0"
+		echo "per_source = UNLIMITED"
+		echo "type = UNLISTED"
+		echo "user = $(id -u -n)"
+		echo "}"
+	} > /tmp/xinetd.conf
+}
+
 get_node_id() {
 	echo "$((${POD_NAME##*-}+1))"
 }
@@ -245,11 +263,17 @@ start_repmgrd() {
 	REPMGR_PID=$!
 }
 
-stop_postgres_and_repmgr() {
+start_xinetd() {
+	xinetd -dontfork -f /tmp/xinetd.conf &
+	XINETD_PID=$!
+}
+
+stop_all() {
 	PGUSER="${PGUSER:-$POSTGRES_USER}" \
         pg_ctl -D "$PGDATA" -w stop
 
 	kill -SIGTERM $REPMGR_PID
+	kill -SIGTERM $XINETD_PID
 }
 
 _main() {
@@ -257,6 +281,7 @@ _main() {
 	setup_env
 	create_database_directories
 	init_pgpass
+	init_xinetd
 	get_node_role
 
 	if [ -z "$REPMGR_CONFIG_ALREADY_EXISTS" ]; then
@@ -288,10 +313,11 @@ _main() {
 	fi
 
 	start_repmgrd
+	start_xinetd
 
 	trap stop_postgres_and_repmgr SIGTERM SIGINT
 
-	wait "$REPMGR_PID"
+	wait $REPMGR_PID $XINETD_PID
 }
 
 if ! _is_sourced; then

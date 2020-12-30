@@ -5,10 +5,10 @@ metadata:
   labels:
     {{- include "postgres-ha.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.pgpool.type }}
+  type: {{ .Values.haproxy.service.type }}
   ports:
-    - port: {{ .Values.service.pgpool.port }}
-      targetPort: pgpool
+    - port: {{ .Values.haproxy.service.port }}
+      targetPort: haproxy
       protocol: TCP
       name: postgres
   selector:
@@ -26,7 +26,7 @@ spec:
   type: ClusterIP
   clusterIP: None
   ports:
-    - port: {{ .Values.service.postgres.port }}
+    - port: {{ .Values.postgres.service.port }}
       targetPort: postgres
       protocol: TCP
       name: postgres
