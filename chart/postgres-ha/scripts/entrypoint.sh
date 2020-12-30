@@ -26,11 +26,6 @@ setup_env() {
 		exit 1
 	fi
 
-        if [ -z $CLUSTER_NETWORK_CIDR ]; then
-                echo "env var CLUSTER_NETWORK_CIDR not set; exiting now"
-                exit 1
-        fi
-
 	# this should be defined via dockerfile
 	if [ -z $PGDATA ]; then
 		echo "env var PGDATA is not set; exiting now"
@@ -117,11 +112,9 @@ init_hba_conf() {
 		echo
 		echo "local   replication     $REPMGR_USER                              trust"
 		echo "host    replication     $REPMGR_USER      127.0.0.1/32            trust"
-		echo "host    replication     $REPMGR_USER      $CLUSTER_NETWORK_CIDR            md5"
 
 		echo "local   $REPMGR_DATABASE          $REPMGR_USER                              trust"
 		echo "host    $REPMGR_DATABASE          $REPMGR_USER      127.0.0.1/32            trust"
-		echo "host    $REPMGR_DATABASE          $REPMGR_USER      $CLUSTER_NETWORK_CIDR            md5"
 
 		echo "host    all             all             all            md5"
 

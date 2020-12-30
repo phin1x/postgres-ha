@@ -63,14 +63,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: CLUSTER_NETWORK_CIDR
-              value: 10.0.0.0/8
             - name: POSTGRES_PASSWORD
-              value: asdf
+              value: {{ .Values.postgresPassword | quote }}
             - name: REPMGR_PASSWORD
-              value: asdf
+              value: {{ .Values.repmgrPassword | quote }}
             - name: HEADLESS_SERVICE
-              value: {{ include "postgres-ha.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+              value: {{ include "postgres-ha.fullname" . }}-headless.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql

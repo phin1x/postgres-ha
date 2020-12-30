@@ -106,3 +106,9 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+clusterDomain: cluster.local
+
+postgresPassword: asdf
+
+repmgrPassword: asdf
