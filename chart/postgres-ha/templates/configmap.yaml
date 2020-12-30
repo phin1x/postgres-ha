@@ -5,5 +5,7 @@ metadata:
   labels:
     {{- include "postgres-ha.labels" . | nindent 4 }}
 data:
-  entrypoint.sh: |-
-    {{- .Files.Get "scripts/entrypoint.sh" | nindent 4 }}
+  postgres-entrypoint.sh: |-
+    {{- .Files.Get "scripts/postgres-entrypoint.sh" | nindent 4 }}
+  pgpool-entrypoint.sh: |-
+    {{- .Files.Get "scripts/pgpool-entrypoint.sh" | nindent 4 }}

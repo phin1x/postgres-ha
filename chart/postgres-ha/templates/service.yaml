@@ -5,12 +5,12 @@ metadata:
   labels:
     {{- include "postgres-ha.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.service.pgpool.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.service.pgpool.port }}
+      targetPort: pgpool
       protocol: TCP
-      name: http
+      name: postgres
   selector:
     {{- include "postgres-ha.selectorLabels" . | nindent 4 }}
 
@@ -26,9 +26,9 @@ spec:
   type: ClusterIP
   clusterIP: None
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.service.postgres.port }}
+      targetPort: postgres
       protocol: TCP
-      name: http
+      name: postgres
   selector:
     {{- include "postgres-ha.selectorLabels" . | nindent 4 }}

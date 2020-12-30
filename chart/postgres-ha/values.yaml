@@ -28,17 +28,20 @@ podAnnotations: {}
 podSecurityContext: {}
   #fsGroup: 70
 
-securityContext:
-  capabilities:
-    add:
-      - CHOWN
+securityContext: {}
+  # capabilities:
+  #   add:
+  #     - CHOWN
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
 
 service:
-  type: ClusterIP
-  port: 15432
+  pgpool:
+    type: ClusterIP
+    port: 5432
+  postgres:
+    port: 15432
 
 ingress:
   enabled: false

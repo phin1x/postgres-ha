@@ -29,16 +29,16 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: postgres
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /scripts/entrypoint.sh
+            - /scripts/postgres-entrypoint.sh
           ports:
-            - name: http
-              containerPort: 80
+            - name: postgres
+              containerPort: 15432
               protocol: TCP
           livenessProbe:
             exec:
@@ -76,6 +76,29 @@ spec:
               mountPath: /var/lib/postgresql
             - name: scripts
               mountPath: /scripts
+        #- name: pgpool
+        #  image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        #  imagePullPolicy: {{ .Values.image.pullPolicy }}
+        #  command:
+        #    - /scripts/pgpool-entrypoint.sh
+        #  ports:
+        #    - name: pgpool
+        #      containerPort: 5432
+        #      protocol: TCP
+        #  resources:
+        #    {{- toYaml .Values.resources | nindent 12 }}
+        #  env:
+        #    - name: POD_NAME
+        #      valueFrom:
+        #        fieldRef:
+        #          fieldPath: metadata.name
+        #    - name: POSTGRES_PASSWORD
+        #      value: asdf
+        #    - name: HEADLESS_SERVICE
+        #      value: {{ include "postgres-ha.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+        #  volumeMounts:
+        #    - name: scripts
+        #      mountPath: /scripts
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

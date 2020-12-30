@@ -65,13 +65,15 @@ setup_env() {
 	if [ -s /etc/repmgr/repmgr.conf ]; then
 		REPMGR_CONFIG_ALREADY_EXISTS='true'
 	fi
+
+	HOME="$(getent passwd $(id -u) | cut -d: -f6)"
 }
 
 create_database_directories() {
 	local user; user="$(id -u -n)"
 
-	mkdir -p "$PGDATA"
-	chmod 700 "$PGDATA"
+	mkdir -p $PGDATA
+	chmod 700 $PGDATA
 
 	mkdir -p /var/run/postgresql || :
 	chmod 775 /var/run/postgresql || :
@@ -103,6 +105,7 @@ init_db() {
 		echo "max_replication_slots = 10"
 		echo "wal_level = 'replica'"
 		echo "hot_standby = on"
+		echo "wal_log_hints = on"
 		echo "archive_mode = on"
 		echo "archive_command = '/bin/true'"
 		echo "shared_preload_libraries = 'repmgr'"
@@ -122,7 +125,7 @@ init_hba_conf() {
 
 		echo "host    all             all             all            md5"
 
-	} >> "$PGDATA/pg_hba.conf"
+	} >> $PGDATA/pg_hba.conf
 }
 
 init_repmgr() {
@@ -161,7 +164,7 @@ init_repmgr_conf() {
 }
 
 init_pgpass() {
-	local loc="$(getent passwd $(id -u) | cut -d: -f6)/.pgpass"
+	local loc="$HOME/.pgpass"
 	{
 		echo "*:${PGPORT}:replication:${REPMGR_USER}:${REPMGR_PASSWORD}"
 		echo "*:${PGPORT}:${REPMGR_DATABASE}:${REPMGR_USER}:${REPMGR_PASSWORD}"
@@ -183,7 +186,7 @@ start_postgres() {
 	set -- "$@" -p $PGPORT
 
 	PGUSER="${PGUSER:-$POSTGRES_USER}" \
-	pg_ctl -D "$PGDATA" \
+	pg_ctl -D $PGDATA \
 		-o "$(printf '%q ' "$@")" \
 		-w start
 }
@@ -198,13 +201,17 @@ register_standby() {
 
 clone_from_primary() {
 	repmgr -h $PRIMARY -U repmgr -d repmgr -f /etc/repmgr/repmgr.conf standby clone $@
+	if [ $? -ne 0 ]; then
+		echo "standby clone failed, could not continue"
+		exit 1
+	fi
 }
 
 get_node_role() {
 	for i in 1 2 3; do
 		local nodes="$(dig +short +search $HEADLESS_SERVICE)"
 		if [ $(echo "$nodes" | wc -l) -eq 0 ] || [ -z $nodes ]; then
-			sleep 1
+			sleep 2
 			continue
 		else
 			for node_ip in $nodes; do
@@ -218,6 +225,7 @@ get_node_role() {
 					exit 1
 				fi
 
+				echo "node role: we are a standby"
 				NODE_ROLE="standby"
 				PRIMARY="$(echo "$primary_conninfo" | awk -F 'host=' '{print $2}' | awk '{print $1}')"
 				
@@ -229,6 +237,7 @@ get_node_role() {
 	done
 
 	NODE_ROLE="primary"
+	echo "node role: we are the primary"
 }
 
 start_repmgrd() {
@@ -268,8 +277,10 @@ _main() {
 		fi
 	else
 		if [ "$NODE_ROLE" = "standby" ]; then
-			clone_from_primary --force
+			# we don't want to create a fresh clone
+			clone_from_primary --replication-conf-only
 			start_postgres "$@"
+			# --force overwrites the current node data in the database
 			register_standby --force
 		else
 			start_postgres "$@"
