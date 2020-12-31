@@ -137,9 +137,8 @@ RUN set -ex \
         && make -j8 install \
 	\
 	&& mkdir /etc/repmgr \
-	&& chown postgres: /etc/repmgr
-
-RUN set -ex \
+	&& chown postgres: /etc/repmgr \
+	\
         # install pgbackrest
         && wget -O /tmp/pgbackrest.tar.gz https://github.com/pgbackrest/pgbackrest/archive/release/${PGBACKREST_VERSION}.tar.gz \
         && mkdir -p /usr/src/pgbackrest \
