@@ -14,11 +14,8 @@ ARG PG_MAJOR
 ENV REPMGR_VERSION=v5.2.0
 ARG REPMGR_VERSION
 
-ENV PGPOOL_VERSION=V4_2_0
-ARG PGPOOL_VERSION
-
-ENV PGLOGICAL_VERSION=REL2_3_3
-ARG PGLOGICAL_VERSION
+ENV PGBACKREST_VERSION=2.31
+ARG PGBACKREST_VERSION
 
 ENV TIMESCALEDB_VERSION=1.7.4
 ARG TIMESCALEDB_VERSION
@@ -32,40 +29,43 @@ RUN set -ex \
         && mkdir /docker-entrypoint-initdb.d \
         && apt-mark showmanual > /tmp/aptmark \
         && apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
-                wget \
-               gcc \
-               make \
-                automake \
-                autoconf \
-               cmake \
-               dpkg-dev \
-                libtool \
-                libunwind-dev \
+		wget \
+		gcc \
+		make \
+		automake \
+		autoconf \
+		cmake \
+		dpkg-dev \
+		libtool \
+		libunwind-dev \
 		ca-certificates \
-               bison \
-               flex \
-               libedit-dev \
-               libxml2-dev \
-               libxslt-dev \
-               llvm-dev \
-               clang \
-               libssl-dev \
-               libipc-run-perl \
-               python3-dev \
-               zlib1g-dev \
-               libicu-dev \
-#              libpam0g-dev \
-               pkg-config \
-               uuid-dev \
-               gettext \
-               gosu \
-               locales \
+		bison \
+		flex \
+		libedit-dev \
+		libxml2-dev \
+		libxslt-dev \
+		llvm-dev \
+		clang \
+		libssl-dev \
+		libipc-run-perl \
+		zlib1g-dev \
+		libicu-dev \
+		liblz4-dev \
+		libzstd-dev \
+		libbz2-dev \
+		pkg-config \
+		uuid-dev \
+		gettext \
+		gosu \
+		locales \
 		dnsutils  \
 		xinetd \
-#              krb5-dev \
-#              tcl-dev \
-#              openldap-dev \
-#              perl-dev \
+#		libpam0g-dev \
+#               python3-dev \
+#		krb5-dev \
+#		tcl-dev \
+#		openldap-dev \
+#		perl-dev \
         \
         && locale-gen en_US.UTF-8 \
         \
@@ -108,7 +108,7 @@ RUN set -ex \
 #              --with-ldap \
 #              --with-tcl \
 #              --with-perl \
-               --with-python \
+#              --with-python \
 #              --with-pam \
                --with-openssl \
                --with-libxml \
@@ -137,23 +137,31 @@ RUN set -ex \
         && make -j8 install \
 	\
 	&& mkdir /etc/repmgr \
-	&& chown postgres: /etc/repmgr \
-        \
-        # install pglogical
-        && wget -O /tmp/pglogical.tar.gz https://github.com/2ndQuadrant/pglogical/archive/${PGLOGICAL_VERSION}.tar.gz \
-        && mkdir -p /usr/src/pglogical \
+	&& chown postgres: /etc/repmgr
+
+RUN set -ex \
+        # install pgbackrest
+        && wget -O /tmp/pgbackrest.tar.gz https://github.com/pgbackrest/pgbackrest/archive/release/${PGBACKREST_VERSION}.tar.gz \
+        && mkdir -p /usr/src/pgbackrest \
         && tar \
                 --extract \
-                --file /tmp/pglogical.tar.gz \
-                --directory /usr/src/pglogical \
+                --file /tmp/pgbackrest.tar.gz \
+                --directory /usr/src/pgbackrest \
                 --strip-components 1 \
-        && rm /tmp/pglogical.tar.gz \
-        && cd /usr/src/pglogical \
+        && rm /tmp/pgbackrest.tar.gz \
+        && cd /usr/src/pgbackrest/src \
         \
         && eval "$(dpkg-buildflags --export=sh)" \
         && export LDFLAGS="$LDFLAGS -s -w" \
+	&& ./configure \
         && make -j8 \
         && make -j8 install \
+	\
+	&& mkdir /etc/pgbackrest \
+	&& chown postgres: /etc/pgbackrest \
+	\
+	&& pg_config --libdir > /etc/ld.so.conf.d/postgres.conf \
+	&& ldconfig \
         \
         # cleanup
         && apt-mark auto '.*' > /dev/null \
@@ -175,40 +183,44 @@ RUN set -ex \
                 | xargs -r apt-mark manual \
         && apt-mark manual gosu locales dnsutils xinetd \
         && apt-get purge -y --auto-remove \
-                wget \
-                gcc \
-               make \
-               cmake \
-               dpkg-dev \
-                automake \
-                autoconf \
-                libtool \
-                libunwind-dev \
-                bison \
-                flex \
-                libedit-dev \
-                libxml2-dev \
-                libxslt-dev \
-                llvm-dev \
-                clang \
-                libssl-dev \
-                python3-dev \
-                zlib1g-dev \
-                libicu-dev \
-#               libpam0g-dev \
-                pkg-config \
-                uuid-dev \
-                gettext \
-               perl \
-                libipc-run-perl \
+		wget \
+		gcc \
+		make \
+		cmake \
+		dpkg-dev \
+		automake \
+		autoconf \
+		libtool \
+		libunwind-dev \
+		bison \
+		flex \
+		libedit-dev \
+		libxml2-dev \
+		libxslt-dev \
+		llvm-dev \
+		clang \
+		libssl-dev \
+		python3-dev \
+		zlib1g-dev \
+		liblz4-dev \
+		libzstd-dev \
+		libbz2-dev \
+		libicu-dev \
+		libpam0g-dev \
+		pkg-config \
+		uuid-dev \
+		gettext \
+		perl \
+		libipc-run-perl \
         && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
         && apt-get clean \
         && cd / \
         && rm -rf \
-               /usr/src/* \
-               /usr/local/share/doc \
-               /usr/local/share/man \
-                /tmp/aptmark \
+		/usr/src/* \
+		/var/lib/apt/lists/* \
+		/usr/local/share/doc \
+		/usr/local/share/man \
+		/tmp/aptmark \
         \
         # make the sample config easier to munge (and "correct by default")
         && sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/lib/postgresql/$PG_MAJOR/share/postgresql.conf.sample \
