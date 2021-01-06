@@ -7,8 +7,6 @@ metadata:
 data:
   entrypoint.sh: |-
     {{- .Files.Get "scripts/entrypoint.sh" | nindent 4 }}
-  postgresqlchk.sh: |-
-    {{- .Files.Get "scripts/postgresqlchk.sh" | nindent 4 }}
 
 ---
 apiVersion: v1
@@ -20,8 +18,13 @@ metadata:
 data:
   haproxy.cfg: |-
     global
-        maxconn 100
-     
+        maxconn 1000
+    
+    resolvers kube
+        nameserver kube kube-dns.kube-system.svc.cluster.local:53
+        hold timeout         600s
+        hold refused         600s
+
     defaults
         log global
         mode tcp
@@ -37,16 +40,19 @@ data:
         monitor-uri /healthz
         option      dontlognull
 
+    frontend stats
+        bind :8404
+        stats enable
+        stats uri /
+        stats refresh 5s
+
     listen postgres_master
         bind *:5432
         mode tcp
-        tcp-check expect string master
         balance leastconn
-        option tcp-check
+        option httpchk
         option allbackups
+        http-check expect status 200
         default-server port 9201 inter 3s downinter 5s slowstart 60s on-marked-down shutdown-sessions
-        {{- $name := include "postgres-ha.fullname" . }}
-        {{- $domain := printf "%s-headless.%s.svc.cluster.local" $name .Release.Namespace }}
-        {{- range $i, $e := until (.Values.replicaCount | int) }}
-        server {{ printf "%s-%d" $name $i }} {{ printf "%s-%d.%s" $name $i $domain }}:15432 check
-        {{- end }}
+        server-template postgres {{ .Values.replicaCount }} _postgres._tcp.{{ include "postgres-ha.fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local check init-addr none resolvers kube
+

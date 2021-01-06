@@ -35,6 +35,8 @@ spec:
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
           command:
+            - /usr/bin/tini
+          args:
             - /scripts/entrypoint.sh
           ports:
             - name: postgres
@@ -56,6 +58,13 @@ spec:
                 - psql -p 15432 -w -c "SELECT 1"
             initialDelaySeconds: 15
             timeoutSeconds: 2
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - pg_ctl -D "$PGDATA" -w stop
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}
           env:
@@ -74,6 +83,32 @@ spec:
               mountPath: /var/lib/postgresql
             - name: scripts
               mountPath: /scripts
+        - name: healthserver
+          image: "{{ .Values.healthserver.image.repository }}:{{ .Values.healthserver.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.healthserver.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.healthserver.securityContext | nindent 12 }}
+          ports:
+            - name: healthserver
+              containerPort: 9201
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9201
+            initialDelaySeconds: 10
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9201
+            initialDelaySeconds: 10
+            periodSeconds: 3
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://postgres@127.0.0.1:15432/postgres"
+          resources:
+            {{- toYaml .Values.healthserver.resources | nindent 12 }}
         - name: haproxy
           image: "{{ .Values.haproxy.image.repository }}:{{ .Values.haproxy.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.haproxy.image.pullPolicy }}
@@ -87,7 +122,7 @@ spec:
             httpGet:
               path: /healthz
               port: 8888
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 3
           resources:
             {{- toYaml .Values.haproxy.resources | nindent 12 }}

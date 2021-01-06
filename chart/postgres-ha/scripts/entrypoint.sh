@@ -9,6 +9,7 @@ _is_sourced() {
 }
 
 check_non_root() {
+	echo "check for non root"
 	if [ "$(id -u)" = '0' ]; then
 		echo "run as root is not allowed"
 		exit 1
@@ -16,6 +17,7 @@ check_non_root() {
 }
 
 setup_env() {
+	echo "setup and validate environment"
 	if [ -z $POSTGRES_PASSWORD ]; then
 		echo "env var POSTGRES_PASSWORD not set; exiting now"
 		exit 1
@@ -65,6 +67,7 @@ setup_env() {
 }
 
 create_database_directories() {
+	echo "create database directories"
 	local user; user="$(id -u -n)"
 
 	mkdir -p $PGDATA
@@ -81,6 +84,7 @@ create_database_directories() {
 }
 
 init_db() {
+	echo "init database and setup postgres configuration"
 	if [ -n "$POSTGRES_INITDB_WALDIR" ]; then
 		set -- --waldir "$POSTGRES_INITDB_WALDIR" "$@"
 	fi
@@ -104,30 +108,36 @@ init_db() {
 		echo "archive_mode = on"
 		echo "archive_command = '/bin/true'"
 		echo "shared_preload_libraries = 'repmgr'"
+		echo "log_destination = 'stderr'"
 	} >> $PGDATA/postgresql.conf
 }
 
 init_hba_conf() {
+	echo "setup hba config"
 	{
+		echo "local   all             all                                     trust"
+		echo "host    all             all             127.0.0.1/32            trust"
 		echo
 		echo "local   replication     $REPMGR_USER                              trust"
 		echo "host    replication     $REPMGR_USER      127.0.0.1/32            trust"
-
+		echo
 		echo "local   $REPMGR_DATABASE          $REPMGR_USER                              trust"
 		echo "host    $REPMGR_DATABASE          $REPMGR_USER      127.0.0.1/32            trust"
-
+		echo
 		echo "host    all             all             all            md5"
 
-	} >> $PGDATA/pg_hba.conf
+	} > $PGDATA/pg_hba.conf
 }
 
 init_repmgr() {
+	echo "init repmgr"
 	psql -c "CREATE ROLE $REPMGR_USER ENCRYPTED PASSWORD '$REPMGR_PASSWORD' SUPERUSER CREATEDB CREATEROLE INHERIT LOGIN;"
 	createdb --owner=$REPMGR_USER $REPMGR_DATABASE
 	psql -c "ALTER USER $REPMGR_USER SET search_path TO repmgr, public;"
 }
 
 init_repmgr_conf() {
+	echo "setup repmgr config"
 	if [ "$1" = 'postgres' ]; then
 		shift
 	fi
@@ -157,6 +167,7 @@ init_repmgr_conf() {
 }
 
 init_pgpass() {
+	echo "setup pgpass config"
 	local loc="$HOME/.pgpass"
 	{
 		echo "*:${PGPORT}:replication:${REPMGR_USER}:${REPMGR_PASSWORD}"
@@ -165,29 +176,12 @@ init_pgpass() {
 	chmod 600 $loc
 }
 
-init_xinetd() {
-	{
-		echo "service postgresqlchk"
-		echo "{"
-		echo "flags = REUSE"
-		echo "socket_type = stream"
-		echo "wait = no"
-		echo "port = 9201"
-		echo "server = /scripts/postgresqlchk.sh"
-		echo "disable = no"
-		echo "only_from = 0.0.0.0/0"
-		echo "per_source = UNLIMITED"
-		echo "type = UNLISTED"
-		echo "user = $(id -u -n)"
-		echo "}"
-	} > /tmp/xinetd.conf
-}
-
 get_node_id() {
 	echo "$((${POD_NAME##*-}+1))"
 }
 
 start_postgres() {
+	echo "starting postgres"
 	if [ "$1" = 'postgres' ]; then
 		shift
 	fi
@@ -203,15 +197,18 @@ start_postgres() {
 }
 
 register_primary() {
+	echo "register as a primary"
 	repmgr -f /etc/repmgr/repmgr.conf primary register $@
 }
 
 register_standby() {
+	echo "register as a standby"
 	repmgr -f /etc/repmgr/repmgr.conf standby register $@
 }
 
 clone_from_primary() {
-	repmgr -h $PRIMARY -U repmgr -d repmgr -f /etc/repmgr/repmgr.conf standby clone $@
+	echo "clone from primary"
+	repmgr -h $PRIMARY -p 15432 -U repmgr -d repmgr -f /etc/repmgr/repmgr.conf standby clone $@
 	if [ $? -ne 0 ]; then
 		echo "standby clone failed, could not continue"
 		exit 1
@@ -219,6 +216,7 @@ clone_from_primary() {
 }
 
 get_node_role() {
+	echo "getting node role"
 	for i in 1 2 3; do
 		local nodes="$(dig +short +search $HEADLESS_SERVICE)"
 		if [ $(echo "$nodes" | wc -l) -eq 0 ] || [ -z $nodes ]; then
@@ -252,21 +250,8 @@ get_node_role() {
 }
 
 start_repmgrd() {
-	repmgrd --daemonize=false -f /etc/repmgr/repmgr.conf &
-	REPMGR_PID=$!
-}
-
-start_xinetd() {
-	xinetd -dontfork -f /tmp/xinetd.conf &
-	XINETD_PID=$!
-}
-
-stop_all() {
-	PGUSER="${PGUSER:-$POSTGRES_USER}" \
-        pg_ctl -D "$PGDATA" -w stop
-
-	kill -SIGTERM $REPMGR_PID
-	kill -SIGTERM $XINETD_PID
+	echo "start repmgr"
+	exec repmgrd --daemonize=false -f /etc/repmgr/repmgr.conf
 }
 
 _main() {
@@ -274,7 +259,6 @@ _main() {
 	setup_env
 	create_database_directories
 	init_pgpass
-	init_xinetd
 	get_node_role
 
 	if [ -z "$REPMGR_CONFIG_ALREADY_EXISTS" ]; then
@@ -302,15 +286,12 @@ _main() {
 			register_standby --force
 		else
 			start_postgres "$@"
+			# --force overwrites the current node data in the database
+			register_primary --force
 		fi
 	fi
 
 	start_repmgrd
-	start_xinetd
-
-	trap stop_postgres_and_repmgr SIGTERM SIGINT
-
-	wait $REPMGR_PID $XINETD_PID
 }
 
 if ! _is_sourced; then

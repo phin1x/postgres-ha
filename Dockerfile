@@ -59,7 +59,7 @@ RUN set -ex \
 		gosu \
 		locales \
 		dnsutils  \
-		xinetd \
+		tini \
 #		libpam0g-dev \
 #               python3-dev \
 #		krb5-dev \
@@ -180,7 +180,7 @@ RUN set -ex \
                 | cut -d: -f1 \
                 | sort -u \
                 | xargs -r apt-mark manual \
-        && apt-mark manual gosu locales dnsutils xinetd \
+        && apt-mark manual gosu locales dnsutils tini \
         && apt-get purge -y --auto-remove \
 		wget \
 		gcc \
